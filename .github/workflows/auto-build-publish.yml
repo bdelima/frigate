@@ -60,10 +60,10 @@ jobs:
           VERSION="${{ steps.pick_tag.outputs.tag }}"
           VERSION="${VERSION#v}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://hub.docker.com/v2/repositories/bdelima/frigate-panther-lake/tags/${VERSION}-panther_lake")
+            "https://hub.docker.com/v2/repositories/bdelima/frigate-panther-lake/tags/${VERSION}")
           if [[ "$STATUS" == "200" ]]; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "${VERSION}-panther_lake already exists on Docker Hub — nothing to do."
+            echo "${VERSION} already exists on Docker Hub — nothing to do."
           else
             echo "already_published=false" >> "$GITHUB_OUTPUT"
           fi
@@ -93,9 +93,9 @@ jobs:
       - name: Push to Docker Hub
         if: steps.check_published.outputs.already_published == 'false'
         run: |
-          docker tag "${IMAGE_TAG}" "bdelima/frigate-panther-lake:${VERSION}-panther_lake"
+          docker tag "${IMAGE_TAG}" "bdelima/frigate-panther-lake:${VERSION}"
           docker tag "${IMAGE_TAG}" "bdelima/frigate-panther-lake:latest"
-          docker push "bdelima/frigate-panther-lake:${VERSION}-panther_lake"
+          docker push "bdelima/frigate-panther-lake:${VERSION}"
           docker push "bdelima/frigate-panther-lake:latest"
 
       - name: Create GitHub Release
@@ -112,7 +112,7 @@ jobs:
             version patches applied — see scripts/build.sh for exact
             versions baked in.
 
-            Docker Hub: `bdelima/frigate-panther-lake:${{ env.VERSION }}-panther_lake`
+            Docker Hub: `bdelima/frigate-panther-lake:${{ env.VERSION }}`
 
       - name: Step summary
         if: always()

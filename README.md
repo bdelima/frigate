@@ -38,7 +38,7 @@ Exact versions are in [`scripts/build.sh`](scripts/build.sh) — that's the sing
 ```yaml
 services:
   frigate:
-    image: bdelima/frigate-panther-lake:latest   # or pin to a specific version, e.g. :0.18.1-panther_lake
+    image: bdelima/frigate-panther-lake:latest   # or pin to a specific version, e.g. :0.18.1
     # ... your existing Frigate compose config (devices, volumes, ports, etc.) is unchanged
 ```
 

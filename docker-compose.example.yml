@@ -1,6 +1,6 @@
 services:
   frigate:
-    image: bdelima/frigate-panther-lake:latest   # or pin to a version, e.g. :0.18.1-panther_lake
+    image: bdelima/frigate-panther-lake:latest   # or pin to a version, e.g. :0.18.1
     container_name: frigate
     restart: unless-stopped
     # Everything below this line is standard Frigate configuration —
