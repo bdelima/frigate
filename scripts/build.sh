@@ -99,12 +99,28 @@ git rev-parse "$TAG" >/dev/null 2>&1 || die "Tag '$TAG' not found in upstream."
 # ---------------------------------------------------------------------------
 BRANCH="npu-update-${TAG}"
 
+# actions/checkout only creates a local branch for the triggering ref (the
+# repo's default branch, checked out earlier) -- every other branch,
+# npu-update included, exists only as origin/npu-update (a remote-tracking
+# ref) in a fresh CI checkout, even with fetch-depth: 0. Fall back to that
+# when there's no local npu-update branch yet, while still preferring a
+# real local branch if one already exists (e.g. local interactive use
+# after `git checkout npu-update`), so this keeps working the same way it
+# always did outside CI.
+if git rev-parse --verify --quiet "$NPU_BRANCH" >/dev/null; then
+  NPU_BRANCH_REF="$NPU_BRANCH"
+elif git rev-parse --verify --quiet "origin/$NPU_BRANCH" >/dev/null; then
+  NPU_BRANCH_REF="origin/$NPU_BRANCH"
+else
+  die "Neither local branch '$NPU_BRANCH' nor 'origin/$NPU_BRANCH' exists -- is the npu-update branch missing from this fork?"
+fi
+
 if git rev-parse --verify "$BRANCH" >/dev/null 2>&1; then
   log "Branch $BRANCH already exists — checking it out"
   git checkout "$BRANCH"
 else
-  log "Creating branch $BRANCH from $NPU_BRANCH"
-  git checkout -b "$BRANCH" "$NPU_BRANCH"
+  log "Creating branch $BRANCH from $NPU_BRANCH_REF"
+  git checkout -b "$BRANCH" "$NPU_BRANCH_REF"
 fi
 
 log "Merging $TAG into $BRANCH"
