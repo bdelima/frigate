@@ -256,7 +256,7 @@ log "Building image with 'make local' (do not use 'docker build' directly — it
 make local
 
 VERSION="${TAG#v}"
-IMAGE_TAG="frigate:${VERSION}-panther_lake"
+IMAGE_TAG="frigate:${VERSION}"
 log "Tagging built image as $IMAGE_TAG"
 docker tag frigate:latest "$IMAGE_TAG"
 

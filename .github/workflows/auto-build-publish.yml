@@ -102,8 +102,8 @@ jobs:
         if: steps.check_published.outputs.already_published == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "panther_lake-${{ steps.pick_tag.outputs.tag }}"
-          name: "Panther Lake build — ${{ steps.pick_tag.outputs.tag }}"
+          tag_name: "${{ env.VERSION }}"
+          name: "Panther Lake build — ${{ env.VERSION }}"
           generate_release_notes: false
           body: |
             Custom Frigate build for Panther Lake NPU support, merging
