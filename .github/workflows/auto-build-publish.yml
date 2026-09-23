@@ -12,6 +12,11 @@ on:
         description: "Upstream Frigate tag to build against (e.g. v0.18.1). Leave blank to auto-pick the latest stable release."
         required: false
         default: ""
+      force:
+        description: "Rebuild and republish even if this tag is already on Docker Hub (e.g. after a scripts/build.sh fix with no upstream version bump). Also deletes and regenerates that tag's stale npu-update-<tag> merge branch, since a plain push of a freshly-regenerated branch would otherwise be rejected as a non-fast-forward against the old one."
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -57,6 +62,11 @@ jobs:
       - name: Check whether this tag is already published
         id: check_published
         run: |
+          if [[ "${{ github.event.inputs.force }}" == "true" ]]; then
+            echo "already_published=false" >> "$GITHUB_OUTPUT"
+            echo "force=true was passed — rebuilding regardless of what's already on Docker Hub."
+            exit 0
+          fi
           VERSION="${{ steps.pick_tag.outputs.tag }}"
           VERSION="${VERSION#v}"
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
@@ -67,6 +77,22 @@ jobs:
           else
             echo "already_published=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Delete stale merge branch (forced rebuild only)
+        if: steps.check_published.outputs.already_published == 'false' && github.event.inputs.force == 'true'
+        run: |
+          BRANCH="npu-update-${{ steps.pick_tag.outputs.tag }}"
+          # build.sh always creates $BRANCH fresh from origin/npu-update in a
+          # CI checkout (actions/checkout never creates a local branch for
+          # anything but the triggering ref, so build.sh's own
+          # already-exists check can never see a same-named local branch
+          # here) -- meaning a forced rebuild's freshly-regenerated branch
+          # has different commit history than whatever's already on origin
+          # from the last time this tag was built, and a plain
+          # `git push origin $BRANCH` at the end of build.sh would be
+          # rejected as a non-fast-forward. Delete the stale branch first so
+          # that push is a normal, clean branch creation.
+          git push origin --delete "$BRANCH" || echo "No existing $BRANCH on origin — nothing to delete."
 
       - name: Set up Docker Buildx
         if: steps.check_published.outputs.already_published == 'false'
@@ -108,9 +134,9 @@ jobs:
           body: |
             Custom Frigate build for Panther Lake NPU support, merging
             Kellen Renshaw's NPU driver PR (#24007) onto upstream
-            ${{ steps.pick_tag.outputs.tag }}, with NPU driver/QSV/iHD
-            version patches applied — see scripts/build.sh for exact
-            versions baked in.
+            ${{ steps.pick_tag.outputs.tag }}, with NPU driver/iHD version
+            patches applied — see scripts/build.sh for exact versions
+            baked in.
 
             Docker Hub: `bdelima/frigate-panther-lake:${{ env.VERSION }}`
 
