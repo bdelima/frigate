@@ -9,8 +9,8 @@ if [ "$(uname -m)" != "x86_64" ]; then
     exit 0
 fi
 
-MEDIA_DRIVER_VERSION="intel-media-25.2.6"
-GMMLIB_VERSION="intel-gmmlib-22.7.2"
+MEDIA_DRIVER_VERSION="intel-media-26.2.4"
+GMMLIB_VERSION="intel-gmmlib-22.10.0"
 
 apt-get -qq update
 apt-get -qq install -y wget gnupg ca-certificates cmake g++ make pkg-config
