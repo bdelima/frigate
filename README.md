@@ -9,8 +9,11 @@ This is Bob's fork, built on top of [Kellen Renshaw's `npu-update` branch](https
 Kellen's `npu-update` branch pins an older NPU driver version (`v1.28.0` as of this writing). Each automated build additionally:
 
 1. **Bumps the NPU driver** to a newer version (currently `v1.38.0`) and the matching Level Zero loader package.
-2. **Pins the QSV runtime** (`libmfxgen1`/`libvpl2`) to known-good pre-regression versions from Intel's own jammy apt repo, instead of the versions Debian trixie ships. *(Note: the real root cause of the Frigate 0.18 QSV regression this was originally built to work around turned out to be a filter-chain ordering bug in `frigate/ffmpeg_presets.py`, not this package version — see the linked Frigate discussion in the commit history. This pin may become unnecessary once that's fixed upstream in 0.18.1; worth revisiting then.)*
-3. **Bumps the iHD media driver** (VAAPI) and `gmmlib` to current quarterly releases (compiled from source, not an apt pin).
+2. **Bumps the iHD media driver** (VAAPI) and `gmmlib` to current quarterly releases (compiled from source, not an apt pin).
+
+### Removed: the QSV runtime pin (2026-09-22)
+
+Earlier builds also pinned the QSV runtime (`libmfxgen1`/`libvpl2`) to older, pre-regression versions from Intel's jammy apt repo, working around a QSV performance regression in Frigate 0.18. That diagnosis was later found to be wrong — the real cause was a filter-chain ordering bug in `frigate/ffmpeg_presets.py`, which this build deliberately does not patch (worked around instead with a config-level `output_args.detect` override in `config.yaml`). The pin outlived its original purpose and, in the `0.18.0-panther_lake` build, was paired for the first time with the bumped iHD media driver above — an untested combination that turned out to be ABI-incompatible: every camera failed at ffmpeg startup with `[QSV @ ...] Error setting child device handle: -17`. The pin has been removed entirely (not re-pinned to a newer version) since it was never solving a real problem to begin with. If you're running an image built before this fix, roll back to the previous working tag and rebuild.
 
 Exact versions are in [`scripts/build.sh`](scripts/build.sh) — that's the single source of truth, not this README.
 

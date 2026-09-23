@@ -4,8 +4,8 @@
 #
 # Builds a custom Frigate image with Kellen Renshaw's Panther Lake NPU
 # driver bump (PR #24007: https://github.com/blakeblackshear/frigate/pull/24007)
-# merged onto a chosen upstream release tag, with Bob's own NPU
-# driver/QSV/iHD version patches applied on top.
+# merged onto a chosen upstream release tag, with Bob's own NPU driver/iHD
+# version patches applied on top.
 #
 # This is the CI-safe, non-interactive descendant of the original
 # build-frigate-npu.sh (which supported an interactive tag picker and a
@@ -59,19 +59,22 @@ OLD_NPU_DRIVER_TAG="v1.28.0"
 OLD_NPU_DRIVER_ASSET="linux-npu-driver-v1.28.0.20251218-20347000698-ubuntu2404.tar.gz"
 OLD_LEVEL_ZERO_LINE="wget https://github.com/oneapi-src/level-zero/releases/download/v1.28.2/level-zero_1.28.2+u22.04_amd64.deb"
 
-# QSV runtime pin — see the long comment in this project's README for why
-# this exists. Kept as-is from the original script; worth revisiting once
-# Frigate 0.18.1 ships its own filter-chain-ordering fix, since that (not
-# this package pin) turned out to be the real root cause of the QSV
-# regression this was originally built to work around.
-QSV_MFXGEN_VERSION="24.2.4-914~22.04"
-QSV_VPL_VERSION="1:2.13.0.0-1012~22.04"
-
-OLD_JAMMY_INSTALL_LINE="    apt-get -qq install --no-install-recommends --no-install-suggests -y \\
-        libmfx1"
-OLD_TRIXIE_GEN_VPL_LINE="    apt-get -qq install -y -t trixie libmfx-gen1.2 libvpl2"
-OLD_TRIXIE_LIBVA_LINE="    apt-get -qq install -y -t trixie libva2 libva-drm2 libzstd1"
-NEW_TRIXIE_LIBVA_LINE="    apt-get -qq install -y -t trixie libva2 libva-drm2 libzstd1 libstdc++6"
+# REMOVED 2026-09-22: this used to also pin libmfxgen1/libvpl2 to specific
+# jammy-era versions ("QSV runtime pin"), to work around a QSV performance
+# regression. That diagnosis was later proven wrong — the real cause was a
+# filter-chain ordering bug in frigate/ffmpeg_presets.py (see README), which
+# this build deliberately does NOT patch (kept as a config-level
+# output_args.detect override in config.yaml instead). The pin itself rode
+# along anyway, unused for its original purpose, until it was combined with
+# the iHD bump below for the first time in a real deployment and caused a
+# hard QSV device-creation failure on every camera (oneVPL/iHD ABI mismatch
+# between the old pinned jammy packages and the newer compiled-from-source
+# iHD driver — errno -17 on qsv_device init). Removed entirely rather than
+# re-pinned to a newer version, since the pin was never solving a real
+# problem in the first place. This also means the libstdc++6 workaround that
+# existed solely to patch a side effect of removing trixie's own oneVPL
+# install line is gone too — that line is no longer touched, so nothing
+# depends on the workaround anymore.
 
 NEW_MEDIA_DRIVER_VERSION="intel-media-26.2.4"
 NEW_GMMLIB_VERSION="intel-gmmlib-22.10.0"
@@ -183,64 +186,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 4: pin the QSV runtime (libmfxgen1/libvpl2)
-# ---------------------------------------------------------------------------
-if grep -qF "libmfxgen1=${QSV_MFXGEN_VERSION}" "$INSTALL_DEPS" 2>/dev/null; then
-  log "install_deps.sh already pinned to QSV runtime ${QSV_MFXGEN_VERSION} — skipping"
-elif grep -qF "$OLD_JAMMY_INSTALL_LINE" "$INSTALL_DEPS" 2>/dev/null && grep -qF "$OLD_TRIXIE_GEN_VPL_LINE" "$INSTALL_DEPS" 2>/dev/null; then
-  log "Pinning QSV runtime: libmfxgen1=${QSV_MFXGEN_VERSION}, libvpl2=${QSV_VPL_VERSION}"
-
-  NEW_JAMMY_INSTALL_LINE="    apt-get -qq install --no-install-recommends --no-install-suggests -y \\
-        libmfx1 libmfxgen1=${QSV_MFXGEN_VERSION} libvpl2=${QSV_VPL_VERSION}"
-
-  python3 - "$INSTALL_DEPS" <<PYEOF
-import sys
-path = sys.argv[1]
-with open(path) as f:
-    content = f.read()
-
-old_jammy = r"""${OLD_JAMMY_INSTALL_LINE}"""
-new_jammy = r"""${NEW_JAMMY_INSTALL_LINE}"""
-old_trixie_line = r"""${OLD_TRIXIE_GEN_VPL_LINE}"""
-
-assert content.count(old_jammy) == 1, f"expected 1 match for jammy install line, found {content.count(old_jammy)}"
-assert content.count(old_trixie_line) == 1, f"expected 1 match for trixie gen/vpl line, found {content.count(old_trixie_line)}"
-
-content = content.replace(old_jammy, new_jammy)
-content = content.replace(old_trixie_line + "\n", "")
-
-with open(path, "w") as f:
-    f.write(content)
-PYEOF
-
-  grep -qF "libmfxgen1=${QSV_MFXGEN_VERSION}" "$INSTALL_DEPS" || die "QSV pin did not apply — check 'grep -n -B5 -A20 intel-graphics.key $INSTALL_DEPS'."
-
-  git add "$INSTALL_DEPS"
-  git commit -m "Pin QSV runtime (libmfxgen1/libvpl2) to pre-Battlemage-bump versions from Intel jammy repo" --no-edit
-  log "QSV runtime pinned and committed"
-else
-  echo "WARNING: Expected QSV install lines not found in $INSTALL_DEPS — skipping. Check manually."
-fi
-
-# ---------------------------------------------------------------------------
-# Step 5: preserve the libstdc++6 upgrade the removed trixie line used to
-# provide as a transitive dependency
-# ---------------------------------------------------------------------------
-if grep -qF "$NEW_TRIXIE_LIBVA_LINE" "$INSTALL_DEPS" 2>/dev/null; then
-  log "libstdc++6 already added to trixie libva line — skipping"
-elif grep -qF "$OLD_TRIXIE_LIBVA_LINE" "$INSTALL_DEPS" 2>/dev/null; then
-  log "Adding libstdc++6 to trixie libva install line"
-  sed -i "s|${OLD_TRIXIE_LIBVA_LINE}|${NEW_TRIXIE_LIBVA_LINE}|" "$INSTALL_DEPS"
-  grep -qF "$NEW_TRIXIE_LIBVA_LINE" "$INSTALL_DEPS" || die "libstdc++6 fix did not apply."
-  git add "$INSTALL_DEPS"
-  git commit -m "Add libstdc++6 to trixie libva install to fix libigdgmm12 dependency after QSV pin" --no-edit
-  log "libstdc++6 fix applied and committed"
-else
-  echo "WARNING: Expected trixie libva install line not found in $INSTALL_DEPS — skipping."
-fi
-
-# ---------------------------------------------------------------------------
-# Step 6: bump the iHD media driver (VAAPI) and gmmlib
+# Step 4: bump the iHD media driver (VAAPI) and gmmlib
 # ---------------------------------------------------------------------------
 MEDIA_DRIVER_SCRIPT="docker/main/build_intel_media_driver.sh"
 
@@ -259,14 +205,14 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 7: push the successfully patched branch (before the build, so the
+# Step 5: push the successfully patched branch (before the build, so the
 # patched source is recoverable even if the build itself fails)
 # ---------------------------------------------------------------------------
 log "Pushing patched branch $BRANCH"
 git push origin "$BRANCH"
 
 # ---------------------------------------------------------------------------
-# Step 8: build
+# Step 6: build
 # ---------------------------------------------------------------------------
 log "Building image with 'make local' (do not use 'docker build' directly — it skips generating frigate/version.py and the image will crash-loop on startup)"
 make local
@@ -283,7 +229,6 @@ echo
 echo "============================================================"
 echo " Build complete: $IMAGE_TAG"
 echo " NPU driver baked in: $NPU_DRIVER_TAG"
-echo " QSV runtime pinned: libmfxgen1=${QSV_MFXGEN_VERSION}, libvpl2=${QSV_VPL_VERSION}"
 echo " iHD media driver: ${NEW_MEDIA_DRIVER_VERSION} (gmmlib ${NEW_GMMLIB_VERSION})"
 echo "============================================================"
 
