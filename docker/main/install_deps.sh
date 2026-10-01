@@ -137,10 +137,10 @@ if [[ "${TARGETARCH}" == "amd64" ]]; then
     wget https://github.com/intel/intel-graphics-compiler/releases/download/v2.32.7/intel-igc-opencl-2_2.32.7+21184_amd64.deb
     wget https://github.com/intel/intel-graphics-compiler/releases/download/v2.32.7/intel-igc-core-2_2.32.7+21184_amd64.deb
     # npu packages
-    wget https://github.com/oneapi-src/level-zero/releases/download/v1.28.2/level-zero_1.28.2+u22.04_amd64.deb
-    wget https://github.com/intel/linux-npu-driver/releases/download/v1.28.0/linux-npu-driver-v1.28.0.20251218-20347000698-ubuntu2404.tar.gz
-    tar -xf linux-npu-driver-v1.28.0.20251218-20347000698-ubuntu2404.tar.gz
-    rm linux-npu-driver-v1.28.0.20251218-20347000698-ubuntu2404.tar.gz
+    wget https://snapshot.ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu/20260830T100000Z/pool/main/l/level-zero-loader/libze1_1.32.0-1~24.04~ppa1_amd64.deb
+    wget https://github.com/intel/linux-npu-driver/releases/download/v1.38.0/linux-npu-driver-v1.38.0.20260910-34487311128-ubuntu2404.tar.gz
+    tar -xf linux-npu-driver-v1.38.0.20260910-34487311128-ubuntu2404.tar.gz
+    rm linux-npu-driver-v1.38.0.20260910-34487311128-ubuntu2404.tar.gz
 
     dpkg -i *.deb
     rm *.deb
