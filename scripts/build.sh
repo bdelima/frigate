@@ -222,12 +222,36 @@ IMAGE_TAG="frigate:${VERSION}"
 log "Tagging built image as $IMAGE_TAG"
 docker tag frigate:latest "$IMAGE_TAG"
 
+# Frigate itself already reports its base version at runtime (version.py,
+# verified below, surfaced via /api/version and the web UI) — but nothing
+# marks this as the Panther Lake NPU variant, or says which NPU driver/media
+# driver versions got patched in, or which commit of this repo it was built
+# from. A container running :latest gives no way to tell that apart from
+# this week's scheduled rebuild without checking Docker Hub by hand. Add a
+# thin label-only layer on top (no functional change, same entrypoint/config)
+# so that's inspectable via `docker inspect` without touching Frigate's own
+# build process at all.
+BUILD_COMMIT="$(git rev-parse HEAD)"
+log "Labeling image with build metadata (NPU driver ${NPU_DRIVER_TAG}, commit ${BUILD_COMMIT})"
+docker build -t "$IMAGE_TAG" - <<EOF
+FROM ${IMAGE_TAG}
+LABEL org.opencontainers.image.source="https://github.com/bdelima/frigate"
+LABEL org.opencontainers.image.url="https://github.com/bdelima/frigate"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.revision="${BUILD_COMMIT}"
+LABEL dev.pumapants.npu-driver-version="${NPU_DRIVER_TAG}"
+LABEL dev.pumapants.media-driver-version="${NEW_MEDIA_DRIVER_VERSION}"
+LABEL dev.pumapants.gmmlib-version="${NEW_GMMLIB_VERSION}"
+ENV PANTHER_LAKE_BUILD_VERSION="${VERSION}"
+EOF
+
 log "Verifying version.py inside the built image"
 docker run --rm --entrypoint sh "$IMAGE_TAG" -c "cat /opt/frigate/frigate/version.py"
 
 echo
 echo "============================================================"
 echo " Build complete: $IMAGE_TAG"
+echo " Build commit: ${BUILD_COMMIT}"
 echo " NPU driver baked in: $NPU_DRIVER_TAG"
 echo " iHD media driver: ${NEW_MEDIA_DRIVER_VERSION} (gmmlib ${NEW_GMMLIB_VERSION})"
 echo "============================================================"

@@ -17,6 +17,15 @@ Earlier builds also pinned the QSV runtime (`libmfxgen1`/`libvpl2`) to older, pr
 
 Exact versions are in [`scripts/build.sh`](scripts/build.sh) — that's the single source of truth, not this README.
 
+## Inspecting a running image's build metadata
+
+Beyond Frigate's own `/api/version` (its base upstream version, visible in the web UI too), this build labels the image with its own metadata, so `docker inspect bdelima/frigate-panther-lake:<tag>` shows which patched versions actually went into it without checking Docker Hub or this repo by hand:
+
+- `org.opencontainers.image.version` / `.revision` — this repo's version string and the exact commit it was built from.
+- `org.opencontainers.image.source` / `.url` — point at this repo (`bdelima/frigate`), not upstream Frigate or Kellen's fork.
+- `dev.pumapants.npu-driver-version` / `.media-driver-version` / `.gmmlib-version` — the patched driver versions baked into this specific build.
+- `PANTHER_LAKE_BUILD_VERSION` — the same version string, also available as an environment variable inside the running container.
+
 ## How builds happen
 
 `.github/workflows/auto-build-publish.yml` runs daily (and can be triggered manually with a specific tag via workflow_dispatch):
